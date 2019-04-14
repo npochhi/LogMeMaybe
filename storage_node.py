@@ -16,6 +16,8 @@ load_balancer_set = []  #TODO
 for ip_addr in load_balancer_set:
 	try:
 		outgoing_lb_conns[ip_addr] = rpyc.connect(ip_addr, SN2LB_PORT)
+	except:
+		print("error")
 
 def get_ip(conn):
 	return conn._channel.stream.getpeername()[0]
