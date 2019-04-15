@@ -2,7 +2,7 @@ import rpyc
 import time
 import threading
 import random
-IP_ADDR = "10.145.219.216" # TODO: Set this
+IP_ADDR = "10.109.56.13" # TODO: Set this
 
 incoming_sn_conns = {}
 incoming_lb_conns = {}
@@ -17,7 +17,7 @@ log_counter = {}
 num_nodeset = 1
 write_set = 1
 
-lb_ips = []
+lb_ips = ["10.145.219.216"]
 
 init_log_agreed = {}
 init_log_prev_nodeset = {}
@@ -76,7 +76,7 @@ class LB2LBService(rpyc.Service):
         print("[LB2LB] Load balancer connected! IP:", ip_addr)
 
     def on_disconnect(self, conn):
-        ip_addr = lb_conns[conn]
+        ip_addr = incoming_lb_conns[conn]
         del incoming_lb_conns[conn]
         for out_obj, ip in outgoing_lb_conns.items():
             if ip == ip_addr:
@@ -99,19 +99,23 @@ class LB2LBService(rpyc.Service):
     def exposed_init_log_abort(self, log_id):
         node_set[log_id] = init_log_prev_nodeset[log_id]
 
+    def abort_waiting(self, log_id, dic, fun):
+        time.sleep(1)
+        if dic[log_id] == False:
+            fun(log_id)
+
     def exposed_init_log_2pc(self, log_id, new_nodes, ip_addr):
         try:
             init_log_commit_recv[log_id] = False
             coor_conn = None
+            init_log_prev_nodeset[log_id] = None
             node_set[log_id] = new_nodes
-            init_log_prev_nodeset
             for conn, conn_addr in outgoing_lb_conns.items():
                 if conn_addr == ip_addr:
-                    coor_conn = outgoing_lb_conns[conn_addr]
-            coor_conn.init_log_agree(log_id)
-            time.sleep(0.5)
-            if init_log_commit_recv[log_id] == False:
-                self.exposed_init_log_abort(log_id)
+                    coor_conn = conn
+            coor_conn.root.init_log_agree(log_id)
+            t1 = threading.Thread(target=self.abort_waiting, args = (log_id, init_log_commit_recv, self.exposed_init_log_abort))
+            t1.start()
         except:
             self.exposed_init_log_abort(log_id)
 
@@ -123,11 +127,10 @@ class LB2LBService(rpyc.Service):
             for conn, conn_ip in outgoing_lb_conns.items():
                 if ip == conn_ip:
                     coor_conn = conn
-            c = outgoing_lb_conns[coor_conn]
+            c = coor_conn
             c.root.write_agreed(log_id)
-            time.sleep(0.5)
-            if write_commit_received[log_id] == False:
-                self.exposed_write_abort(log_id)
+            t1 = threading.Thread(target=self.abort_waiting, args = (log_id, write_commit_received, self.exposed_write_abort))
+            t1.start()
         except:
             self.exposed_write_abort(log_id)
 
@@ -154,7 +157,7 @@ class Client2LBService(rpyc.Service):
         client_conn = None
         for client, client_ip in outgoing_client_conns.items():
             if ip_addr == client_ip:
-                client_conn = client
+                client_conn = client       
         try:
             if log_id in node_set:
                 print("[LoadBalancer] Log with this log_id already exists!")
@@ -166,6 +169,8 @@ class Client2LBService(rpyc.Service):
             new_nodes = random.choices(list(outgoing_sn_conns.values()), k=num_nodeset)
             node_set[log_id] = new_nodes
             total_lbs = len(outgoing_lb_conns)
+
+            print(node_set[log_id])
 
             for conn in outgoing_lb_conns:
                 conn.root.init_log_2pc(log_id, new_nodes, IP_ADDR)
@@ -180,6 +185,7 @@ class Client2LBService(rpyc.Service):
                 client_conn.root.commit("[Client] A log with log id " + str(log_id) + " has been created successfully!")
                 log_counter[log_id] = 0
                 print("[LoadBalancer] A log with log_id", log_id, "has been created successfully!")
+
         except:
             try:
                 print("[LoadBalancer] Log creation failed!")
@@ -258,6 +264,7 @@ class Client2LBService(rpyc.Service):
                 for conn, ip in outgoing_sn_conns.items():
                     if ip == node:
                         conn.root.read(client_ip, record_id, log_id) 
+            print("Read successfull !")
         except:
             print("[LoadBalancer] Read failed!")
             client_conn = None
@@ -294,4 +301,7 @@ if __name__ == "__main__":
     t2.start()
     t3.start()
     for ip in lb_ips:
-        rpyc.connect(ip, 50000)
+        try:
+            outgoing_lb_conns[rpyc.connect(ip, 50000)] = ip
+        except:
+            pass
