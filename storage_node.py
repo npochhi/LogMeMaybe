@@ -26,7 +26,7 @@ def check_debug( msg ):
 	if(DEBUG == True):
 		print(msg + "\n")
 
-load_balancer_set = ['10.145.219.216']  #TODO
+load_balancer_set = ['10.109.56.13', '10.145.219.216']
 
 def get_ip(conn):
 	return conn._channel.stream.sock.getpeername()[0]
@@ -66,6 +66,14 @@ def check_SN2SN_conn(ip_addr):
 def start_service_thread(service):
 	service.start()
 
+def connect_to_loadbalancer():
+	for ip_addr in load_balancer_set:
+		try:
+			outgoing_lb_conns[ip_addr] = rpyc.connect(ip_addr, SN2LB_PORT)
+			check_debug("[SN2LB] LoadBalancer node connected! IP: " + ip_addr)
+			break
+		except:
+			check_debug("[SN2LB] Error connecting to LoadBalancer! IP: " + ip_addr)
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 class Record:
@@ -114,6 +122,7 @@ class LB2SNService(rpyc.Service):
 		del incoming_lb_conns[ip_addr]
 		del outgoing_lb_conns[ip_addr]
 		check_debug("[LB2SN] LoadBalancer node disconnected! IP: " + ip_addr)
+		connect_to_loadbalancer()
 		#abort
 
 	def abort_waiting(self, log_id, record_id):
@@ -184,9 +193,9 @@ class LB2SNService(rpyc.Service):
 
 if __name__ == "__main__":
 	try:
-		# if os.path.exists("./home"):
-		# 	shutil.rmtree('./home')
-		# os.mkdir("./home")
+		if os.path.exists("./home"):
+			shutil.rmtree('./home')
+		os.mkdir("./home")
 			
 		sn2sn = SN2SNService()
 		lb2sn = LB2SNService()
@@ -198,12 +207,7 @@ if __name__ == "__main__":
 		t1.start()
 		t2.start()
 
-		for ip_addr in load_balancer_set:
-			try:
-				outgoing_lb_conns[ip_addr] = rpyc.connect(ip_addr, SN2LB_PORT)
-				check_debug("[SN2LB] LoadBalancer node connected! IP: " + ip_addr)
-			except:
-				check_debug("[SN2LB] Error connecting to LoadBalancer! IP: " + ip_addr)
+		connect_to_loadbalancer()
 
 		t1.join()
 		t2.join()
