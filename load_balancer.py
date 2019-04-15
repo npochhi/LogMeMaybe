@@ -2,7 +2,6 @@ import rpyc
 import time
 import threading
 import random
-
 IP_ADDR = "10.145.219.216" # TODO: Set this
 
 incoming_sn_conns = {}
@@ -15,78 +14,71 @@ node_set = {}
 log_sem = {}
 log_counter = {}
 
-num_nodeset = 2
-write_set = 2
+num_nodeset = 1
+write_set = 1
 
-NUM_NODESET = 2
-NUM_COPYSET = 2
+lb_ips = []
 
 init_log_agreed = {}
 init_log_prev_nodeset = {}
 init_log_commit_recv = {}
 
+write_agreed_count = {}
+write_commit_received = {}
+
+rpyc.core.protocol.DEFAULT_CONFIG['allow_pickle'] = True
+
+
 def get_ip(conn):
-    return conn._channel.stream.getpeername()[0]
+    return conn._channel.stream.sock.getpeername()[0]
 
 class SN2LBService(rpyc.Service):
     def on_connect(self, conn):
         ip_addr = get_ip(conn)
         incoming_sn_conns[conn] = ip_addr
         outgoing_sn_conns[rpyc.connect(ip_addr, 50003)] = ip_addr # TODO: Add port
-        print("[SN2LB] Storage node connected! IP:", IP_addr)
+        print("[SN2LB] Storage node connected! IP:", ip_addr)
 
     def on_disconnect(self, conn):
         ip_addr = incoming_sn_conns[conn]
         del incoming_sn_conns[conn]
-        for l_id, nodes in node_set:
+        for l_id, nodes in node_set.items():
             if conn in nodes:
                 node_set[l_id].remove(conn)
-        for out_obj, ip in outgoing_sn_conns:
+        for out_obj, ip in outgoing_sn_conns.items():
             if ip == ip_addr:
                 del outgoing_sn_conns[out_obj]
                 break
-        print("[SN2LB] Storage node disconnected! IP:", sn_conns[conn])
+        print("[SN2LB] Storage node disconnected! IP:", ip_addr)
 
-    def exposed_get_all_sn(self):
+    def exposed_get_all_sn(self ):
         return incoming_sn_conns.values()
 
     def exposed_get_all_lb(self):
         return incoming_lb_conns.values()
 
-    def exposed_write_commit_reqest(IP_ADDR, log_id):
-        counter_semaphore[log_id].acquire()
+    def exposed_write_commit_request(self, IP_ADDR, log_id):
         log_counter[log_id] = log_counter[log_id] + 1
-        counter_semaphore[log_id].release()
         c = outgoing_lb_conns[ip]
         c.root.write_agreed(log_id)
 
-    def exposed_write_agreed(log_id):
+    def exposed_write_agreed(self, log_id):
         write_agreed_count[log_id] = write_agreed_count[log_id] + 1
 
-    def exposed_write_commit(log_id):
-        write_commit_received[log_id] = true
-
-    def exposed_write_abort(record):
-        counter_semaphore[log_id].acquire()
-        log_counter[log_id] = log_counter[log_id] - 1
-        counter_semaphore[log_id].release()
 
 class LB2LBService(rpyc.Service):
-    def __init__(self, **kwargs):
-        self.token = 0
-        super(LB2LBService, self).__init__(**kwargs)
-
     def on_connect(self, conn):
         ip_addr = get_ip(conn)
         incoming_lb_conns[conn] = ip_addr
-        out_obj = rpyc.connect(ip_addr, 50000) # TODO: add port
-        outgoing_lb_conns[out_obj] = ip_addr
+        if ip_addr not in outgoing_lb_conns.values():
+            out_obj = rpyc.connect(ip_addr, 50000) # TODO: add port
+            outgoing_lb_conns[out_obj] = ip_addr
         print("[LB2LB] Load balancer connected! IP:", ip_addr)
 
     def on_disconnect(self, conn):
         ip_addr = lb_conns[conn]
         del incoming_lb_conns[conn]
-        for out_obj, ip in outgoing_lb_conns:
+        for out_obj, ip in outgoing_lb_conns.items():
             if ip == ip_addr:
                 del outgoing_lb_conns[out_obj]
                 break
@@ -123,7 +115,7 @@ class LB2LBService(rpyc.Service):
         except:
             self.exposed_init_log_abort(log_id)
 
-    def exposed_write_commit_reqest(ip, log_id):
+    def exposed_write_commit_request(self, ip, log_id):
         try:
             write_commit_received[log_id] = False
             log_counter[log_id] = log_counter[log_id] + 1
@@ -140,51 +132,54 @@ class LB2LBService(rpyc.Service):
             self.exposed_write_abort(log_id)
 
 
-    def exposed_write_agreed(log_id):
+    def exposed_write_agreed(self, log_id):
         write_agreed_count[log_id] = write_agreed_count[log_id] + 1
 
-    def exposed_write_commit(log_id):
+    def exposed_write_commit(self, log_id):
         write_commit_received[log_id] = True
 
-    def exposed_write_abort(log_id):
+    def exposed_write_abort(self, log_id):
         log_counter[log_id] = log_counter[log_id] - 1
 
 class Client2LBService(rpyc.Service):
     def on_connect(self, conn):
         ip_addr = get_ip(conn)
-        outgoing_client_conns[rpyc.connect(ip_addr, 50005)] = ip_addr # TODO: add port
-        print("[Client2LB] Client connected! IP:", conn._channel.stream.sock.getpeername())
+        outgoing_client_conns[rpyc.connect(ip_addr, 50006)] = ip_addr # TODO: add port
+        print("[Client2LB] Client connected! IP:", ip_addr)
 
     def on_disconnect(self, conn):
         print("[Client2LB] Client disconnected!")
 
     def exposed_init_log(self, log_id, ip_addr):
         client_conn = None
-        for client, client_ip in outgoing_client_conns:
+        for client, client_ip in outgoing_client_conns.items():
             if ip_addr == client_ip:
                 client_conn = client
         try:
             if log_id in node_set:
                 print("[LoadBalancer] Log with this log_id already exists!")
                 client_conn.root.commit("[Client] Log with this log_id already exists!")
-
+                return
+            print("[LoadBalancer] Log does not exist, creating....")
             init_log_agreed[log_id] = 0
-
-            new_nodes = random.choices(outgoing_sn_conns.values(), num_nodeset)
+            print(outgoing_sn_conns)
+            new_nodes = random.choices(list(outgoing_sn_conns.values()), k=num_nodeset)
+            node_set[log_id] = new_nodes
             total_lbs = len(outgoing_lb_conns)
 
             for conn in outgoing_lb_conns:
                 conn.root.init_log_2pc(log_id, new_nodes, IP_ADDR)
 
             time.sleep(0.5)
-
-            if init_log_agreed != total_lbs:
+            if init_log_agreed[log_id] != total_lbs:
                 for conn in outgoing_lb_conns:
                     conn.root.init_log_abort(log_id)
             else:
                 for conn in outgoing_lb_conns:
                     conn.root.init_log_commit(log_id)
-                client_conn.root.commit("[Client] A log with log id", log_id, "has been created successfully!")
+                client_conn.root.commit("[Client] A log with log id " + str(log_id) + " has been created successfully!")
+                log_counter[log_id] = 0
+                print("[LoadBalancer] A log with log_id", log_id, "has been created successfully!")
         except:
             try:
                 print("[LoadBalancer] Log creation failed!")
@@ -196,98 +191,107 @@ class Client2LBService(rpyc.Service):
                         pass
             except:
                 pass
+        print(node_set)
         init_log_agreed[log_id] = 0
 
-    def write_func(client_ip, record):
-        try:
-            # local transaction
-            copy_set = random.choices(node_set[log_id], write_set)
+    def write_func(self, client_ip, log_id, data):
+        client_conn = None
+        for client, c_ip in outgoing_client_conns.items():
+            if client_ip == c_ip:
+                client_conn = client
 
-            record.set_copy_set(copy_set)
+            # local transaction
+        try:
+            copy_set = random.choices(list(node_set[log_id]), k=write_set)
             log_counter[log_id] += 1
-            record.set_id(log_counter[log_id])
+
 
             out_conn = len(outgoing_lb_conns) + len(copy_set)
 
+            write_agreed_count[log_id] = 0
             # 2 phase commit
             for conn in outgoing_lb_conns:
-                conn.root.write_commit_reqest(IP_ADDR, record.log_id)
+                conn.root.write_commit_request(IP_ADDR, log_id)
+            print(copy_set)
+            print(outgoing_sn_conns.values())
             for ip in copy_set:
                 copy_conn = None
-                for node_ip, node_conn in outgoing_lb_conns.items():
+                for node_conn, node_ip in outgoing_sn_conns.items():
                     if node_ip == ip:
                         copy_conn = node_conn
-                copy_conn.root.write_commit_reqest(IP_ADDR, record)
+                copy_conn.root.write_commit_request(IP_ADDR, log_id, log_counter[log_id], copy_set, data)
 
             time.sleep(0.5)
-            if write_agreed_count[log] == out_conn:
+            if write_agreed_count[log_id] == out_conn:
                 for conn in outgoing_lb_conns:
-                    conn.root.write_commit(record.log_id)
+                    conn.root.write_commit(log_id)
                 for copy_ip in copy_set:
                     copy_conn = None
-                    for node_ip, node_conn in outgoing_lb_conns.items():
+                    for node_conn, node_ip in outgoing_sn_conns.items():
                         if node_ip == ip:
                             copy_conn = node_conn
-                    copy_conn.root.write_commit(client_ip, record)
-                    client_conn = None
-                    for client, client_ip in outgoing_client_conns:
-                        if ip_addr == client_ip:
-                            client_conn = client
-                    client_conn.root.commit("[Client] Record successfully written! Record ID:", record.log_id, "Log ID:", log_id)
+                    copy_conn.root.write_commit(client_ip, log_id, log_counter[log_id])
+                client_conn.root.commit("[Client] Record successfully written! Record ID: " + str(log_counter[log_id]) + " Log ID: " + str(log_id))
+                print("[LoadBalancer] Record successfully written! Record ID: " + str(log_counter[log_id]) + " Log ID: " + str(log_id))
             else:
                 for conn in outgoing_lb_conns:
-                    conn.root.write_abort(record.log_id)
+                    conn.root.write_abort(log_id)
                 for ip in copy_set:
                     copy_conn = None
-                    for copy_ip, node_conn in outgoing_lb_conns.items():
+                    for node_conn, copy_ip in outgoing_sn_conns.items():
                         if copy_ip == ip:
                             copy_conn = node_conn
-                    copy_conn.root.write_abort(record)
+                    copy_conn.root.write_abort(log_id, log_counter[log_id])
+                print("[LoadBalancer] Write failed!")
         except:
             print("[LoadBalancer] Write failed!")
-            client_conn = None
-            for client, client_ip in outgoing_client_conns:
-                if ip_addr == client_ip:
-                    client_conn = client
             client_conn.root.commit("[Client] Write failed!")
             for conn in outgoing_lb_conns:
                 try:
                     conn.root.write_abort(log_id)
                 except:
                     pass
-        write_agreed_count[log_id] = 0
        
     def exposed_read(self, client_ip, record_id, log_id):
         try:
             for node in node_set[log_id]:
-                for ip in outgoing_sn_conns.values():
+                for conn, ip in outgoing_sn_conns.items():
                     if ip == node:
-                        c = outgoing_sn_conns[node]
-                        c.root.read(client_ip, record_id, log_id) 
+                        conn.root.read(client_ip, record_id, log_id) 
         except:
             print("[LoadBalancer] Read failed!")
             client_conn = None
             for client, c_ip in outgoing_client_conns.items():
                 if c_ip == client_ip:
                     client_conn = client
-            client_conn.root.commit("[Client] Read successful!")
+            client_conn.root.commit("[Client] Read failed!")
 
 
-    def exposed_write(self, client_ip, record):
+    def exposed_write(self, client_ip, log_id, data):
         if log_id in node_set.keys():
-            write_func(client_ip, record) 
+            self.write_func(client_ip, log_id, data) 
         else:
-            self.init_log(log_id)
-            write_func(client_ip, record)
+            self.exposed_init_log(log_id, client_ip)
+            self.write_func(client_ip, log_id, data)
+
+from rpyc.utils.server import ThreadedServer
+import threading
+
+def server_start(service):
+    service.start()
 
 if __name__ == "__main__":
     lb2lb = LB2LBService()
     sn2lb = SN2LBService()
-    client2lb = Client2LB()
-    from rpyc.utils.server import ThreadedServer
-    lb2lb_service = ThreadedServer(lb2lb, port=50000)
-    sn2lb_service = ThreadedServer(sn2lb, port=50001)
-    client2lb_service = ThreadedServer(client2lb, port=50002)
-    lb2lb.start()
-    sn2lb.start()
-    client2lb.start()
+    client2lb = Client2LBService()
+    lb2lb_service = ThreadedServer(lb2lb, port=50000, protocol_config=rpyc.core.protocol.DEFAULT_CONFIG)
+    sn2lb_service = ThreadedServer(sn2lb, port=50001, protocol_config=rpyc.core.protocol.DEFAULT_CONFIG)
+    client2lb_service = ThreadedServer(client2lb, port=50002, protocol_config=rpyc.core.protocol.DEFAULT_CONFIG)
+    t1 = threading.Thread(target=server_start, args=(lb2lb_service,))
+    t2 = threading.Thread(target=server_start, args=(sn2lb_service,))
+    t3 = threading.Thread(target=server_start, args=(client2lb_service,))
+    t1.start()
+    t2.start()
+    t3.start()
+    for ip in lb_ips:
+        rpyc.connect(ip, 50000)
