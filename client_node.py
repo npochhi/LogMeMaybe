@@ -19,6 +19,7 @@ try:
 	outgoing_lb_conns[ip_addr1] = rpyc.connect(ip_addr1, Client2LB_PORT)
 except:
 	print("error connecting load balancer")
+	exit(0)
 
 def get_ip(conn):
 	return conn._channel.stream.getpeername()[0]
@@ -39,8 +40,11 @@ class SN2ClientService(rpyc.Service):
 	def on_disconnect(self, conn):
 		pass
 
-	def exposed_read(self, record):
+	def exposed_read_receive(self, record):
 		print(record.data)
+
+	def exposed_write_receive(self, record_id):
+		print("record successfully written with record id : " + record_id)
 
 
 while True:
@@ -49,8 +53,13 @@ while True:
 	if x == 1:
 		print("Enter log_id and record_id : ")
 		log_id, record_id = int(input().split())
-		record = outgoing_lb_conns[load_balancer_set[0]].root.read(self_ipaddr, log_id, record_id)
-		print(record.data)
+		try:
+			outgoing_lb_conns[load_balancer_set[0]].root.read(self_ipaddr, log_id, record_id)
+		except:
+			temp = load_balancer_set[0]
+			del load_balancer_set[0]
+			load_balancer_set.append(temp)
+			outgoing_lb_conns[load_balancer_set[0]].root.read(self_ipaddr, log_id, record_id)
 
 	else:
 		new_record = record()
@@ -59,5 +68,3 @@ while True:
 		print("Enter record data : ")
 		new_record.data = input()
 		outgoing_lb_conns.conns[load_balancer_set[0]].root.write(self_ipaddr, new_record)
-
-

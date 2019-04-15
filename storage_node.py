@@ -22,8 +22,8 @@ for ip_addr in load_balancer_set:
 def get_ip(conn):
 	return conn._channel.stream.getpeername()[0]
 
-def check_SN2CLIENT_conn( ip_addr ):
-	if(ip_addr in outgoing_lb_conns.keys())
+def check_SN2CLIENT_conn(ip_addr):
+	if(ip_addr in outgoing_lb_conns.keys()):
 		return outgoing_lb_conns[ip_addr]
 	else:
 		conn = rpyc.connect(ip_addr, SN2CLIENT_PORT)
@@ -62,8 +62,10 @@ class LB2SNService(rpyc.Service):
 				conn.root.write_agreed( record.log_id )
 			except:
 				conn.root.write_abort( record )
+		except:
+			pass
 
-	def exposed_write_commit( IP_ADDR, record_id )
+	def exposed_write_commit( IP_ADDR, record_id ):
 		conn = check_SN2CLIENT_conn(IP_ADDR)
 		conn.root.write_receive( record_id )
 
