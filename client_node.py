@@ -5,8 +5,7 @@ import random
 import os
 from record_class import Record
 
-Client2LB_PORT = 65458
-Client2SN_PORT = 95648
+Client2LB_PORT = 50002
 
 DEBUG = True
 
@@ -94,7 +93,7 @@ while True:
 		if DEBUG:
 			print("Sending read request to Load Balancer with ip addr : " + load_balancer_set[0])
 		outgoing_lb_conns[load_balancer_set[0]].root.read(self_ipaddr, log_id, record_id)
-		
+
 	else:
 		new_record = Record()
 		print("Enter log_id : ")
