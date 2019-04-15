@@ -123,6 +123,24 @@ class LB2LBService(rpyc.Service):
 		except:
 			self.exposed_init_log_abort(log_id)
 
+	def exposed_write_commit_reqest(IP_ADDR, log_id):
+        counter_semaphore[log_id].acquire()
+        log_counter[log_id] = log_counter[log_id] + 1
+        counter_semaphore[log_id].release()
+        c = outgoing_lb_conns[ip]
+        c.root.write_agreed(log_id)
+
+    def exposed_write_agreed(log_id):
+        write_agreed_count[log_id] = write_agreed_count[log_id] + 1
+
+    def exposed_write_commit(log_id):
+        write_commit_received[log_id] = true
+
+    def exposed_write_abort(record):
+        counter_semaphore[log_id].acquire()
+        log_counter[log_id] = log_counter[log_id] - 1
+        counter_semaphore[log_id].release()
+
 class Client2LBService(rpyc.Service):
 	def on_connect(self, conn):
 		ip_addr = get_ip(conn)
