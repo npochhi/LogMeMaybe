@@ -91,19 +91,6 @@ class LB2ClientService(rpyc.Service):
 		del load_balancer_set[0]
 		load_balancer_set.append(temp)
 		connect_load_balancer()
-		# temp = load_balancer_set[0]
-		# del load_balancer_set[0]
-		# load_balancer_set.append(temp)
-		# try:
-		# 	if DEBUG:
-		# 		print("[LB2Cl] Connecting load balancer with ip addr : " + load_balancer_set[0])
-		# 	outgoing_lb_conns[load_balancer_set[0]] = rpyc.connect(load_balancer_set[0], Client2LB_PORT)
-		# 	if DEBUG:
-		# 		print("[LB2Cl] Connection successfull with load balancer having ip addr : " + load_balancer_set[0])
-		# except:
-		# 	print("[LB2Cl] error connecting load balancer")	
-		# 	exit(0)	
-
 	def exposed_commit(self, msg):
 		print(msg)
 
@@ -122,15 +109,6 @@ if __name__ == "__main__":
 	t2 = threading.Thread(target=server_start, args=(lb2cl_service,))
 	t1.start()
 	t2.start()
-	# try:
-	# 	if DEBUG:
-	# 		print("Connecting load balancer with ip addr : " + load_balancer_set[0])
-	# 	outgoing_lb_conns[load_balancer_set[0]] = rpyc.connect(load_balancer_set[0], Client2LB_PORT)
-	# 	if DEBUG:
-	# 		print("Connection successfull with load balancer having ip addr : " + load_balancer_set[0])
-	# except:
-	# 	print("error connecting load balancer")
-	# 	exit(0)
 	connect_load_balancer()
 	while True:
 		print("Enter 1 to read, 2 for writing:")
