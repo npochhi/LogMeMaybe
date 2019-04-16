@@ -27,7 +27,7 @@ def check_debug( msg ):
 	if(DEBUG == True):
 		print(msg + "\n")
 
-load_balancer_set = ['10.109.56.13']
+load_balancer_set = ['10.109.56.13', '10.145.251.101']
 
 def get_ip(conn):
 	return conn._channel.stream.sock.getpeername()[0]
@@ -41,8 +41,8 @@ def get_key(val, fun, my_dict):
 	return None
 
 def check_SN2CLIENT_conn(ip_addr):
-	if(ip_addr in outgoing_lb_conns.keys()):
-		return outgoing_lb_conns[ip_addr]
+	if(ip_addr in outgoing_client_conns.keys()):
+		return outgoing_client_conns[ip_addr]
 	else:
 		try:
 			conn = rpyc.connect(ip_addr, SN2CLIENT_PORT)
@@ -127,7 +127,7 @@ class LB2SNService(rpyc.Service):
 		#abort
 
 	def abort_waiting(self, log_id, record_id):
-		time.sleep(1)
+		time.sleep(5)
 		if is_commit_received[log_id] == False:
 			self.exposed_write_abort(log_id, record_id)
 
@@ -174,15 +174,14 @@ class LB2SNService(rpyc.Service):
 			check_debug("[READ] Failed to send record to Client! File: " + file_name + " CLIENT_IP: " + IP_ADDR)
 
 	def exposed_replicate( self, log_id, old_ip, new_ip ):
-		dirc = "./home/"
-		logs = os.walk(dirc)[1]
+		dirc = "./home"
+		logs = list(os.walk(dirc))[0][1]
 		records = [  ]
-		if str(log_id) in logs:
-			logdirc = './home' + str(log_id)
-			records += [ logdirc + x for x in os.walk(logdirc)[2] ]
+		if log in logs:
+			logdirc = './home/' + log
+			records += [ logdirc + '/' + x for x in list(os.walk(logdirc))[0][2] ]
 		for record in records:
-			record_path = './home/' + record
-			record_obj = pickle.load(open(record_path, "rb"))
+			record_obj = pickle.load(open(record, "rb"))
 			if(old_ip in record_obj.copy_set):
 				record_obj.remove(old_ip)
 				record_obj.add(new_ip)
