@@ -294,7 +294,8 @@ class Client2LBService(rpyc.Service):
                             copy_conn = node_conn
                     copy_conn.root.write_abort(log_id, log_counter[log_id])
                 print("[LoadBalancer] Write failed!")
-        except:
+        except Exception as e: 
+            print(e)
             print("[LoadBalancer] Write failed!")
             client_conn.root.commit("[Client] Write failed!")
             for conn in outgoing_lb_conns:
