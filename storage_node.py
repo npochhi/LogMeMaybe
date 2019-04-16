@@ -100,7 +100,8 @@ class SN2SNService(rpyc.Service):
 	def on_disconnect(self, conn):
 		ip_addr = get_key(conn, "SN2SN", incoming_sn_conns)
 		del incoming_sn_conns[ip_addr]
-		del outgoing_sn_conns[ip_addr]
+		if(ip_addr in outgoing_sn_conns.keys()):
+			del outgoing_sn_conns[ip_addr]
 		check_debug("[SN2SN] Storage node disconnected! IP: " + ip_addr)
 
 	def exposed_replicate_receive( self, log_id, record_id, copy_set, data ):
@@ -177,16 +178,17 @@ class LB2SNService(rpyc.Service):
 		dirc = "./home"
 		logs = list(os.walk(dirc))[0][1]
 		records = [  ]
-		if log in logs:
-			logdirc = './home/' + log
+
+		if str(log_id) in logs:
+			logdirc = './home/' + str(log_id)
 			records += [ logdirc + '/' + x for x in list(os.walk(logdirc))[0][2] ]
 		for record in records:
 			record_obj = pickle.load(open(record, "rb"))
 			if(old_ip in record_obj.copy_set):
-				record_obj.remove(old_ip)
-				record_obj.add(new_ip)
+				record_obj.copy_set.remove(old_ip)
+				record_obj.copy_set.append(new_ip)
 				conn = check_SN2SN_conn(new_ip)
-				check_debug("[REPLICATE] Record Send to Storage Node! File: " + file_name + " CLIENT_IP: " + IP_ADDR)
+				check_debug("[REPLICATE] Record Send to Storage Node! File: " + record + " STORAGE_NODE_IP " + new_ip)
 				conn.root.replicate_receive(record_obj.log_id, record_obj.record_id, record_obj.copy_set, record_obj.data)
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
