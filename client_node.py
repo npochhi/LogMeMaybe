@@ -3,6 +3,7 @@ import time
 import threading
 import random
 import os
+import pickle
 
 rpyc.core.protocol.DEFAULT_CONFIG['allow_pickle'] = True
 
@@ -16,8 +17,8 @@ outgoing_lb_conns = {}
 incoming_sn_conns = {}
 incoming_lb_conns = {}
 self_ipaddr = "10.145.180.194"
-ip_addr1 = "10.145.219.216"
-ip_addr2 = "localhost"
+ip_addr1 = "10.109.56.13"
+ip_addr2 = "10.145.219.216"
 
 load_balancer_set = [ip_addr1,ip_addr2]  
 
@@ -46,8 +47,14 @@ class SN2ClientService(rpyc.Service):
 			print("[SN2Cl] Storage node disconnected with ip addr : " + ip_addr)
 
 	def exposed_read_receive(self, log_id, record_id, data):
-		print("[SN2Cl] log_id : " + str(log_id) + "\t record_id : " + str(record_id))
-		print(data)
+		folder_name = "./"+ "Log " + str(log_id)
+		file_name = folder_name + "/" + str(record_id)
+		if not os.path.isdir("./folder_name"):
+			os.mkdir(folder_name)
+		if not os.path.exists("./file_name"):
+			pickle.dump(data, open(file_name, "wb"))
+			print("[SN2Cl] log_id : " + str(log_id) + "\t record_id : " + str(record_id))
+			print("[SN2Cl] Data :\t" + data)
 
 	def exposed_write_receive(self, record_id):
 		print("[SN2Cl] record successfully written with record id : " + str(record_id))
@@ -100,6 +107,7 @@ if __name__ == "__main__":
 		if DEBUG:
 			print("Connecting load balancer with ip addr : " + load_balancer_set[0])
 		outgoing_lb_conns[load_balancer_set[0]] = rpyc.connect(load_balancer_set[0], Client2LB_PORT)
+		outgoing_lb_conns[load_balancer_set[1]] = rpyc.connect(load_balancer_set[1], Client2LB_PORT)
 		if DEBUG:
 			print("Connection successfull with load balancer having ip addr : " + load_balancer_set[0])
 	except:
@@ -122,3 +130,5 @@ if __name__ == "__main__":
 			if DEBUG:
 				print("Sending write request to Load Balancer with ip addr : " + load_balancer_set[0])
 			outgoing_lb_conns[load_balancer_set[0]].root.write(self_ipaddr, log_id, data)
+			time.sleep(10)
+			print(outgoing_lb_conns[load_balancer_set[1]].root.get_node_set())
