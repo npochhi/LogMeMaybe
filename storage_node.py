@@ -193,6 +193,7 @@ class LB2SNService(rpyc.Service):
 			if(old_ip in record_obj.copy_set):
 				record_obj.copy_set.remove(old_ip)
 				record_obj.copy_set.append(new_ip)
+				pickle.dump(record_obj, open(record, "wb"))
 				conn = check_SN2SN_conn(new_ip)
 				check_debug("[REPLICATE] Record Sending to Storage Node! File: " + record + " STORAGE_NODE_IP " + new_ip)
 				conn.root.replicate_receive(record_obj.log_id, record_obj.record_id, tuple(record_obj.copy_set), record_obj.data)
