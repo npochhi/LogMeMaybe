@@ -43,13 +43,29 @@ class SN2LBService(rpyc.Service):
         ip_addr = incoming_sn_conns[conn]
         del incoming_sn_conns[conn]
         for l_id, nodes in node_set.items():
-            if conn in nodes:
-                node_set[l_id].remove(conn)
+            if ip_addr in nodes:
+                node_set[l_id].remove(ip_addr)
         for out_obj, ip in outgoing_sn_conns.items():
             if ip == ip_addr:
                 del outgoing_sn_conns[out_obj]
                 break
         print("[SN2LB] Storage node disconnected! IP:", ip_addr)
+
+        log_list = []
+        for key, value in node_set.items():
+            if ip_addr in value:
+                log_list.add(key)
+        ip_list = []
+        for key, value in outgoing_sn_conns.items():
+            ip_list.add(value)
+        for log in log_list:
+            new_ip = random.sample(list(set(ip_list)-set(node_set[log])), 1)
+            for node in node_set[log]:
+                for conn, ip in outgoing_sn_conns.items():
+                    if node == ip:
+                        conn.root.replicate(log, ip_addr, new_ip)              
+            node_set[log].add(new_ip)   
+        print("[SN2LB] Replication Done! new IP: ", new_ip)
 
     def exposed_get_all_sn(self ):
         return incoming_sn_conns.values()
@@ -173,7 +189,9 @@ class Client2LBService(rpyc.Service):
             for conn in outgoing_lb_conns:
                 conn.root.init_log_2pc(log_id, tuple(new_nodes), IP_ADDR)
 
-            time.sleep(0.5)
+            t_end = time.time() + 0.5
+            while init_log_agreed[log_id] != total_lbs and time.time() < t_end:
+                continue
             if init_log_agreed[log_id] != total_lbs:
                 for conn in outgoing_lb_conns:
                     conn.root.init_log_abort(log_id)
@@ -226,7 +244,9 @@ class Client2LBService(rpyc.Service):
                 copy_conn.root.write_commit_request(IP_ADDR, log_id, log_counter[log_id], tuple(copy_set), data)
             
 
-            time.sleep(0.5)
+            t_end = time.time() + 0.5
+            while write_agreed_count[log_id] != out_conn and time.time() < t_end:
+                continue
             if write_agreed_count[log_id] == out_conn:
                 for conn in outgoing_lb_conns:
                     conn.root.write_commit(log_id)
