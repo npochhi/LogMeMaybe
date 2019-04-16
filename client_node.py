@@ -16,9 +16,9 @@ DEBUG = True
 outgoing_lb_conns = {}
 incoming_sn_conns = {}
 incoming_lb_conns = {}
-self_ipaddr = "10.145.180.194"
+self_ipaddr = "10.145.252.92"
 ip_addr1 = "10.109.56.13"
-ip_addr2 = "10.145.219.216"
+ip_addr2 = "10.145.251.101"
 
 load_balancer_set = [ip_addr1,ip_addr2]  
 
@@ -33,6 +33,21 @@ def get_key(val, fun, my_dict):
 		print("[ERROR] On_disconnect error! Service: " + fun)
 	exit(0) 
 	return None
+
+def connect_load_balancer():
+	if DEBUG:
+		print("Connecting load balancer with ip addr : " + load_balancer_set[0])
+	try:
+		outgoing_lb_conns[load_balancer_set[0]] = rpyc.connect(load_balancer_set[0], Client2LB_PORT)
+		if DEBUG:
+			print("Connection successfull with load balancer having ip addr : " + load_balancer_set[0])
+	except:
+		temp = load_balancer_set[0]
+		del load_balancer_set[0]
+		load_balancer_set.append(temp)
+		time.sleep(1)
+		connect_load_balancer()
+
 
 class SN2ClientService(rpyc.Service):
 	def on_connect(self, conn):
@@ -49,9 +64,9 @@ class SN2ClientService(rpyc.Service):
 	def exposed_read_receive(self, log_id, record_id, data):
 		folder_name = "./"+ "Log " + str(log_id)
 		file_name = folder_name + "/" + str(record_id)
-		if not os.path.isdir("./folder_name"):
+		if not os.path.isdir("./" + folder_name):
 			os.mkdir(folder_name)
-		if not os.path.exists("./file_name"):
+		if not os.path.exists("./" + file_name):
 			pickle.dump(data, open(file_name, "wb"))
 			print("[SN2Cl] log_id : " + str(log_id) + "\t record_id : " + str(record_id))
 			print("[SN2Cl] Data :\t" + data)
@@ -75,15 +90,19 @@ class LB2ClientService(rpyc.Service):
 		temp = load_balancer_set[0]
 		del load_balancer_set[0]
 		load_balancer_set.append(temp)
-		try:
-			if DEBUG:
-				print("[LB2Cl] Connecting load balancer with ip addr : " + load_balancer_set[0])
-			outgoing_lb_conns[load_balancer_set[0]] = rpyc.connect(load_balancer_set[0], Client2LB_PORT)
-			if DEBUG:
-				print("[LB2Cl] Connection successfull with load balancer having ip addr : " + load_balancer_set[0])
-		except:
-			print("[LB2Cl] error connecting load balancer")	
-			exit(0)	
+		connect_load_balancer()
+		# temp = load_balancer_set[0]
+		# del load_balancer_set[0]
+		# load_balancer_set.append(temp)
+		# try:
+		# 	if DEBUG:
+		# 		print("[LB2Cl] Connecting load balancer with ip addr : " + load_balancer_set[0])
+		# 	outgoing_lb_conns[load_balancer_set[0]] = rpyc.connect(load_balancer_set[0], Client2LB_PORT)
+		# 	if DEBUG:
+		# 		print("[LB2Cl] Connection successfull with load balancer having ip addr : " + load_balancer_set[0])
+		# except:
+		# 	print("[LB2Cl] error connecting load balancer")	
+		# 	exit(0)	
 
 	def exposed_commit(self, msg):
 		print(msg)
@@ -103,16 +122,16 @@ if __name__ == "__main__":
 	t2 = threading.Thread(target=server_start, args=(lb2cl_service,))
 	t1.start()
 	t2.start()
-	try:
-		if DEBUG:
-			print("Connecting load balancer with ip addr : " + load_balancer_set[0])
-		outgoing_lb_conns[load_balancer_set[0]] = rpyc.connect(load_balancer_set[0], Client2LB_PORT)
-		outgoing_lb_conns[load_balancer_set[1]] = rpyc.connect(load_balancer_set[1], Client2LB_PORT)
-		if DEBUG:
-			print("Connection successfull with load balancer having ip addr : " + load_balancer_set[0])
-	except:
-		print("error connecting load balancer")
-		exit(0)
+	# try:
+	# 	if DEBUG:
+	# 		print("Connecting load balancer with ip addr : " + load_balancer_set[0])
+	# 	outgoing_lb_conns[load_balancer_set[0]] = rpyc.connect(load_balancer_set[0], Client2LB_PORT)
+	# 	if DEBUG:
+	# 		print("Connection successfull with load balancer having ip addr : " + load_balancer_set[0])
+	# except:
+	# 	print("error connecting load balancer")
+	# 	exit(0)
+	connect_load_balancer()
 	while True:
 		print("Enter 1 to read, 2 for writing:")
 		x = int(input())
@@ -130,5 +149,4 @@ if __name__ == "__main__":
 			if DEBUG:
 				print("Sending write request to Load Balancer with ip addr : " + load_balancer_set[0])
 			outgoing_lb_conns[load_balancer_set[0]].root.write(self_ipaddr, log_id, data)
-			time.sleep(10)
-			print(outgoing_lb_conns[load_balancer_set[1]].root.get_node_set())
+			#print(outgoing_lb_conns[load_balancer_set[1]].root.get_node_set())
