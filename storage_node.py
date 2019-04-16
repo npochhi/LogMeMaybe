@@ -41,21 +41,19 @@ def get_key(val, fun, my_dict):
 	return None
 
 def check_SN2CLIENT_conn(ip_addr):
-	to_handle = True
 	if(ip_addr in outgoing_client_conns.keys()):
 		try:
 			get_ip(outgoing_client_conns[ip_addr])
-			to_handle = False
+			return outgoing_client_conns[ip_addr]
 		except:
 			pass
-	if to_handle:
-		try:
-			conn = rpyc.connect(ip_addr, SN2CLIENT_PORT)
-			check_debug("[SN2CLIENT] Client node connected! IP: " + ip_addr)
-			outgoing_client_conns[ip_addr] = conn
-			return conn
-		except:
-			check_debug("[SN2CLIENT] Error connecting to Client Node! IP: " + ip_addr)
+	try:
+		conn = rpyc.connect(ip_addr, SN2CLIENT_PORT)
+		check_debug("[SN2CLIENT] Client node connected! IP: " + ip_addr)
+		outgoing_client_conns[ip_addr] = conn
+		return conn
+	except:
+		check_debug("[SN2CLIENT] Error connecting to Client Node! IP: " + ip_addr)
 
 def check_SN2SN_conn(ip_addr):
 	if(ip_addr in outgoing_sn_conns.keys()):
