@@ -41,9 +41,14 @@ def get_key(val, fun, my_dict):
 	return None
 
 def check_SN2CLIENT_conn(ip_addr):
+	to_handle = True
 	if(ip_addr in outgoing_client_conns.keys()):
-		return outgoing_client_conns[ip_addr]
-	else:
+		try:
+			get_ip(outgoing_client_conns[ip_addr])
+			to_handle = False
+		except:
+			pass
+	if to_handle:
 		try:
 			conn = rpyc.connect(ip_addr, SN2CLIENT_PORT)
 			check_debug("[SN2CLIENT] Client node connected! IP: " + ip_addr)
@@ -90,7 +95,9 @@ class Record:
 	def set_record_id(self, record_id):
 		self.record_id = record_id
 
-#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
 class SN2SNService(rpyc.Service):
 	def on_connect(self, conn):
 		ip_addr = get_ip(conn)
