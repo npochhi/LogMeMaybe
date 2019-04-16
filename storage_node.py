@@ -46,7 +46,7 @@ def check_SN2CLIENT_conn(ip_addr):
 			get_ip(outgoing_client_conns[ip_addr])
 			return outgoing_client_conns[ip_addr]
 		except:
-			pass
+			check_debug("[SN2CLIENT] Client node reconnection required! IP: " + ip_addr)
 	try:
 		conn = rpyc.connect(ip_addr, SN2CLIENT_PORT)
 		check_debug("[SN2CLIENT] Client node connected! IP: " + ip_addr)
@@ -167,8 +167,6 @@ class LB2SNService(rpyc.Service):
 	def exposed_write_commit( self, IP_ADDR, log_id, record_id ):
 		check_debug("[WRITE COMMIT] Commit received log_id, record_id: " + str(log_id)+ ", " + str(record_id))
 		is_commit_received[log_id] = True
-		conn = check_SN2CLIENT_conn(IP_ADDR)
-		conn.root.write_receive( record_id )
 
 	def exposed_read( self, IP_ADDR, record_id, log_id ):
 		folder_name = "./home/"+ str(log_id)
