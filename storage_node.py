@@ -71,7 +71,6 @@ def connect_to_loadbalancer():
 		try:
 			outgoing_lb_conns[ip_addr] = rpyc.connect(ip_addr, SN2LB_PORT)
 			check_debug("[SN2LB] LoadBalancer node connected! IP: " + ip_addr)
-			break
 		except:
 			check_debug("[SN2LB] Error connecting to LoadBalancer! IP: " + ip_addr)
 
@@ -138,7 +137,7 @@ class LB2SNService(rpyc.Service):
 			check_debug("[WRITE ABORT] Record deleted! File: " + file_name)
 
 	def exposed_write_commit_request( self, IP_ADDR, log_id, record_id, copy_set, data ):
-		record = Record(log_id, record_id, copy_set, data)
+		record = Record(log_id, record_id, list(copy_set), data)
 		conn = outgoing_lb_conns[ IP_ADDR ]
 		folder_name = "./home/"+ str(record.log_id)
 		file_name = folder_name + "/" + str(record.record_id)
