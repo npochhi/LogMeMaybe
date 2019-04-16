@@ -105,14 +105,7 @@ class SN2SNService(rpyc.Service):
 		check_debug("[SN2SN] Storage node disconnected! IP: " + ip_addr)
 
 	def exposed_replicate_receive( self, log_id, record_id, copy_set, data ):
-		print("HEy")
-		print(type(copy_set))
-		print(type(list(copy_set)))
-		print(record_id)
-		print(data)
 		record = Record(log_id, record_id, list(copy_set), data)
-		print(copy_set)
-		print("hey")
 		file_name = "./home/" + str(record.log_id) + "/" + str(record.record_id)
 		folder_name = "./home/" + str(record.log_id)
 		if ( not os.path.exists(file_name) ):
