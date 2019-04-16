@@ -172,13 +172,22 @@ class LB2LBService(rpyc.Service):
     def exposed_write_abort(self, log_id):
         log_counter[log_id] = log_counter[log_id] - 1
 
+incoming_client_conns = {}
+
 class Client2LBService(rpyc.Service):
     def on_connect(self, conn):
         ip_addr = get_ip(conn)
+        incoming_client_conns[conn] = ip_addr
         outgoing_client_conns[rpyc.connect(ip_addr, 50006)] = ip_addr # TODO: add port
         print("[Client2LB] Client connected! IP:", ip_addr)
 
     def on_disconnect(self, conn):
+        ip_addr = incoming_client_conns[conn]
+        del incoming_client_conns[conn]
+        for client_conn, client_ip in outgoing_client_conns.items():
+            if client_ip == ip_addr:
+                del outgoing_client_conns[client_conn]
+                break
         print("[Client2LB] Client disconnected!")
 
     def exposed_init_log(self, log_id, ip_addr):
