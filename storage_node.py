@@ -27,7 +27,7 @@ def check_debug( msg ):
 	if(DEBUG == True):
 		print(msg + "\n")
 
-load_balancer_set = ['10.109.56.13', '10.145.219.216']
+load_balancer_set = ['10.109.56.13']
 
 def get_ip(conn):
 	return conn._channel.stream.sock.getpeername()[0]
