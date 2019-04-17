@@ -2,7 +2,7 @@ import rpyc
 import time
 import threading
 import random
-IP_ADDR = "10.145.251.101" # TODO: Set this
+IP_ADDR = "10.109.56.13" # TODO: Set this
 
 incoming_sn_conns = {}
 incoming_lb_conns = {}
@@ -17,7 +17,7 @@ log_counter = {}
 num_nodeset = 1
 write_set = 1
 
-lb_ips = ["10.109.56.13"]
+lb_ips = ["10.145.251.101"]
 
 
 
@@ -119,7 +119,7 @@ class LB2LBService(rpyc.Service):
 
     def exposed_sychronizer(self, log_id, list_, int_):
         node_set[log_id] = list(list_)
-        log_counter[log_id] = list(int_)
+        log_counter[log_id] = int_
 
     def exposed_get_all_sn(self):
         return incoming_sn_conns.values()
