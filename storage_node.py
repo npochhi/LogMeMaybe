@@ -6,6 +6,7 @@ import os
 import pickle
 import shutil
 import sys
+import time
 
 rpyc.core.protocol.DEFAULT_CONFIG['allow_pickle'] = True
 
@@ -136,8 +137,10 @@ class LB2SNService(rpyc.Service):
 		#abort
 
 	def abort_waiting(self, log_id, record_id):
-		time.sleep(5)
-		if is_commit_received[log_id] == False:
+		stop = time.time() + 20
+		while(stop>time.time() and is_commit_received[log_id] == False):
+			pass
+		if(is_commit_received[log_id] == False):
 			self.exposed_write_abort(log_id, record_id)
 
 	def exposed_sychronize_connect2LB(self):
