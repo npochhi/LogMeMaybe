@@ -2,7 +2,7 @@ import rpyc
 import time
 import threading
 import random
-IP_ADDR = "10.109.56.13" # TODO: Set this
+IP_ADDR = "10.145.251.101" # TODO: Set this
 
 incoming_sn_conns = {}
 incoming_lb_conns = {}
@@ -14,10 +14,10 @@ node_set = {}
 log_sem = {}
 log_counter = {}
 
-num_nodeset = 1
-write_set = 1
+num_nodeset = 2
+write_set = 2
 
-lb_ips = ["10.145.251.101"]
+lb_ips = ["10.145.166.52"]
 
 
 
@@ -73,8 +73,8 @@ class SN2LBService(rpyc.Service):
             print("new IP: ", new_ip)
             node_set[log] = list(node_set[log]) + [new_ip]   
         
-        print("node_set : ", node_set )
-        print("log_list : ", log_list )
+        #print("node_set : ", node_set )
+        #print("log_list : ", log_list )
         print("[SN2LB] Replication Done! new IP: ", new_ip)
 
     def exposed_get_all_sn(self ):
@@ -102,7 +102,7 @@ class LB2LBService(rpyc.Service):
                 print(log_counter[log_id])
                 out_obj.root.sychronizer(log_id, tuple(node_set[log_id]), log_counter[log_id])
             for conn in outgoing_sn_conns.keys():
-                conn.root.sychronize_connect2LB()
+                conn.root.sychronize_connect2LB(IP_ADDR)
 
         print("[LB2LB] Load balancer connected! IP:", ip_addr)
         
@@ -224,13 +224,13 @@ class Client2LBService(rpyc.Service):
                 return
             print("[LoadBalancer] Log does not exist, creating....")
             init_log_agreed[log_id] = 0
-            print(outgoing_sn_conns)
+            #print(outgoing_sn_conns)
             new_nodes = random.sample(list(outgoing_sn_conns.values()), num_nodeset)
             node_set[log_id] = new_nodes
             total_lbs = len(outgoing_lb_conns)
 
 
-            print(node_set[log_id])
+            #print(node_set[log_id])
 
             for conn in outgoing_lb_conns:
                 conn.root.init_log_2pc(log_id, tuple(new_nodes), IP_ADDR)
@@ -258,7 +258,7 @@ class Client2LBService(rpyc.Service):
                         pass
             except:
                 pass
-        print(node_set)
+        #print(node_set)
         init_log_agreed[log_id] = 0
         log_sem[log_id].release()
 
@@ -282,7 +282,7 @@ class Client2LBService(rpyc.Service):
             # 2 phase commit
             for conn in outgoing_lb_conns:
                 conn.root.write_commit_request(IP_ADDR, log_id)
-            print(copy_set)
+            #print(copy_set)
             print(outgoing_sn_conns.values())
             for ip in copy_set:
                 copy_conn = None
@@ -298,8 +298,8 @@ class Client2LBService(rpyc.Service):
             if write_agreed_count[log_id] == out_conn:
                 for conn in outgoing_lb_conns:
                     conn.root.write_commit(log_id)
-                print(outgoing_sn_conns.items())
-                print(copy_set)
+                #print(outgoing_sn_conns.items())
+                #print(copy_set)
                 for copy_ip in copy_set:
                     copy_conn = None
                     for node_conn, node_ip in outgoing_sn_conns.items():
