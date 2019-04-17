@@ -70,8 +70,9 @@ def start_service_thread(service):
 def connect_to_loadbalancer():
 	for ip_addr in load_balancer_set:
 		try:
-			outgoing_lb_conns[ip_addr] = rpyc.connect(ip_addr, SN2LB_PORT)
-			check_debug("[SN2LB] LoadBalancer node connected! IP: " + ip_addr)
+			if(ip_addr not in outgoing_lb_conns.keys()):
+				outgoing_lb_conns[ip_addr] = rpyc.connect(ip_addr, SN2LB_PORT)
+				check_debug("[SN2LB] LoadBalancer node connected! IP: " + ip_addr)
 		except:
 			check_debug("[SN2LB] Error connecting to LoadBalancer! IP: " + ip_addr)
 
@@ -172,12 +173,12 @@ class LB2SNService(rpyc.Service):
 		except:
 			check_debug("[READ] Failed to send record to Client! File: " + file_name + " CLIENT_IP: " + IP_ADDR)
 
-	def exposed_replicate( self, old_ip, new_ip ):
+	def exposed_replicate( self, log_id, old_ip, new_ip ):
 		dirc = "./home/"
 		logs = os.walk(dirc)[1]
 		records = [  ]
-		for log in logs:
-			logdirc = './home' + log
+		if str(log_id) in logs:
+			logdirc = './home' + str(log_id)
 			records += [ logdirc + x for x in os.walk(logdirc)[2] ]
 		for record in records:
 			record_path = './home/' + record
