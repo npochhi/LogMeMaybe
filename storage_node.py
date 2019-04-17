@@ -140,6 +140,9 @@ class LB2SNService(rpyc.Service):
 		if is_commit_received[log_id] == False:
 			self.exposed_write_abort(log_id, record_id)
 
+	def exposed_sychronize_connect2LB(self):
+		connect_to_loadbalancer()
+
 	def exposed_write_abort( self, log_id, record_id ):
 		folder_name = "./home/"+ str(log_id)
 		file_name = folder_name + "/" + str(record_id)
