@@ -6,7 +6,6 @@ import os
 import pickle
 import shutil
 import sys
-import time
 
 rpyc.core.protocol.DEFAULT_CONFIG['allow_pickle'] = True
 
@@ -28,7 +27,7 @@ def check_debug( msg ):
 	if(DEBUG == True):
 		print(msg + "\n")
 
-load_balancer_set = ['10.109.56.13', '10.145.251.101']
+load_balancer_set = ['10.145.251.101', '10.145.166.52']
 
 def get_ip(conn):
 	return conn._channel.stream.sock.getpeername()[0]
@@ -143,7 +142,7 @@ class LB2SNService(rpyc.Service):
 		if(is_commit_received[log_id] == False):
 			self.exposed_write_abort(log_id, record_id)
 
-	def exposed_sychronize_connect2LB(self):
+	def exposed_sychronize_connect2LB(self, unused):
 		connect_to_loadbalancer()
 
 	def exposed_write_abort( self, log_id, record_id ):
