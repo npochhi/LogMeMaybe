@@ -2,7 +2,7 @@ import rpyc
 import time
 import threading
 import random
-IP_ADDR = "10.109.56.13" # TODO: Set this
+IP_ADDR = "10.145.251.101" # TODO: Set this
 
 incoming_sn_conns = {}
 incoming_lb_conns = {}
@@ -14,10 +14,12 @@ node_set = {}
 log_sem = {}
 log_counter = {}
 
-num_nodeset = 2
-write_set = 2
+num_nodeset = 1
+write_set = 1
 
-lb_ips = ["10.145.251.101"]
+lb_ips = ["10.109.56.13"]
+
+
 
 init_log_agreed = {}
 init_log_prev_nodeset = {}
@@ -90,9 +92,21 @@ class LB2LBService(rpyc.Service):
         ip_addr = get_ip(conn)
         incoming_lb_conns[conn] = ip_addr
         if ip_addr not in outgoing_lb_conns.values():
+            #  shynchonisation period
+
             out_obj = rpyc.connect(ip_addr, 50000) # TODO: add port
             outgoing_lb_conns[out_obj] = ip_addr
+            for log_id in node_set.keys():
+                print(log_id)
+                print(tuple(node_set[log_id]))
+                print(log_counter[log_id])
+                out_obj.root.sychronizer(log_id, tuple(node_set[log_id]), log_counter[log_id])
+            for conn in outgoing_sn_conns.keys():
+                conn.root.sychronize_connect2LB()
+
         print("[LB2LB] Load balancer connected! IP:", ip_addr)
+        
+
 
     def on_disconnect(self, conn):
         ip_addr = incoming_lb_conns[conn]
@@ -102,6 +116,10 @@ class LB2LBService(rpyc.Service):
                 del outgoing_lb_conns[out_obj]
                 break
         print("[LB2LB] Load balancer disconnected! IP:", ip_addr)
+
+    def exposed_sychronizer(self, log_id, list_, int_):
+        node_set[log_id] = list(list_)
+        log_counter[log_id] = list(int_)
 
     def exposed_get_all_sn(self):
         return incoming_sn_conns.values()
@@ -121,7 +139,9 @@ class LB2LBService(rpyc.Service):
         node_set[log_id] = None
 
     def abort_waiting(self, log_id, dic, fun):
-        time.sleep(1)
+        stop = time.time() + 20
+        while(stop > time.time() and dic[log_id]==False):
+            pass
         if dic[log_id] == False:
             fun(log_id)
 
@@ -215,7 +235,9 @@ class Client2LBService(rpyc.Service):
             for conn in outgoing_lb_conns:
                 conn.root.init_log_2pc(log_id, tuple(new_nodes), IP_ADDR)
 
-            time.sleep(0.5)
+            stop = time.time() + 20
+            while(stop > time.time() and init_log_agreed[log_id] != total_lbs):
+                pass
             if init_log_agreed[log_id] != total_lbs:
                 for conn in outgoing_lb_conns:
                     conn.root.init_log_abort(log_id)
@@ -270,7 +292,9 @@ class Client2LBService(rpyc.Service):
                 copy_conn.root.write_commit_request(IP_ADDR, log_id, log_counter[log_id], tuple(copy_set), data)
             
 
-            time.sleep(0.5)
+            stop = time.time() + 20
+            while(stop > time.time() and write_agreed_count[log_id] != out_conn):
+                pass
             if write_agreed_count[log_id] == out_conn:
                 for conn in outgoing_lb_conns:
                     conn.root.write_commit(log_id)
